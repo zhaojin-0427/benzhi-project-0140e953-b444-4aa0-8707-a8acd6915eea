@@ -70,22 +70,22 @@ func (b *TransferBatch) permitCovers(s Specimen) bool {
 }
 
 // RecalculatePermitQuota 先按许可登记顺序、再按材料代码生成确定性投影；
-// 样本也按相同的稳定许可顺序占用有效额度。
+// 同一许可在所有允许材料之间共享扣减，样本按稳定的许可登记顺序占用有效额度。
 func (b *TransferBatch) RecalculatePermitQuota() {
 	type quotaKey struct {
 		permitIndex int
 		code        string
 	}
-	remaining := map[quotaKey]int{}
+	remaining := map[int]int{}
 	usageIndex := map[quotaKey]int{}
 	b.PermitQuota = nil
 	b.PermitWarnings = nil
 	for permitIndex, permit := range b.Permits {
 		codes := append([]string(nil), permit.AllowedMaterialCodes...)
 		sort.Strings(codes)
+		remaining[permitIndex] = permit.QuantityLimit
 		for _, code := range codes {
 			key := quotaKey{permitIndex: permitIndex, code: code}
-			remaining[key] = permit.QuantityLimit
 			usageIndex[key] = len(b.PermitQuota)
 			b.PermitQuota = append(b.PermitQuota, PermitQuotaUsage{
 				PermitID: permit.ID, PermitNumber: permit.PermitNumber,
@@ -101,21 +101,27 @@ func (b *TransferBatch) RecalculatePermitQuota() {
 			if specimen.CollectedAt.Before(permit.ValidFrom) || specimen.CollectedAt.After(permit.ValidUntil) {
 				continue
 			}
-			key := quotaKey{permitIndex: permitIndex, code: specimen.MaterialCode}
-			available, covers := remaining[key]
-			if !covers {
+			covered := false
+			for _, code := range permit.AllowedMaterialCodes {
+				if code == specimen.MaterialCode {
+					covered = true
+					break
+				}
+			}
+			if !covered {
 				continue
 			}
 			hasEffectivePermit = true
+			available := remaining[permitIndex]
 			allocated := unallocated
 			if allocated > available {
 				allocated = available
 			}
 			if allocated > 0 {
-				remaining[key] -= allocated
+				remaining[permitIndex] -= allocated
+				key := quotaKey{permitIndex: permitIndex, code: specimen.MaterialCode}
 				index := usageIndex[key]
 				b.PermitQuota[index].UsedQuantity += allocated
-				b.PermitQuota[index].Remaining -= allocated
 				unallocated -= allocated
 			}
 			if unallocated == 0 {
@@ -131,6 +137,13 @@ func (b *TransferBatch) RecalculatePermitQuota() {
 				Code: code, MaterialCode: specimen.MaterialCode, SpecimenID: specimen.ID,
 				ShortfallQuantity: unallocated, Message: message,
 			})
+		}
+	}
+	for permitIndex, permit := range b.Permits {
+		sharedRemaining := remaining[permitIndex]
+		for _, code := range permit.AllowedMaterialCodes {
+			key := quotaKey{permitIndex: permitIndex, code: code}
+			b.PermitQuota[usageIndex[key]].Remaining = sharedRemaining
 		}
 	}
 }
