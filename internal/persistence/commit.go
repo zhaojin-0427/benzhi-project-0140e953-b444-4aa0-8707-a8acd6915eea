@@ -91,8 +91,15 @@ func (s *Store) Commit(request CommitRequest) (json.RawMessage, bool, error) {
 	s.records = append(s.records, record)
 	s.idempotency[request.IdempotencyKey] = IdempotencyResult{RequestDigest: request.RequestDigest, Response: append(json.RawMessage(nil), request.Response...)}
 	s.sequence, s.lastDigest = record.Sequence, record.Digest
+	// Once the event log has been durably synced, the commit is irreversible.
+	// The projection snapshot is only a recovery cache derived from the event
+	// log, so a failure while refreshing it must not turn an already-committed
+	// result into an error: otherwise callers would observe a failed response
+	// while queries and idempotent retries see the committed state. Keep the
+	// accepted result; the stale snapshot is rebuilt on the next successful
+	// commit or on reopen via validateSnapshot.
 	if err := s.writeSnapshot(); err != nil {
-		return nil, false, err
+		return append(json.RawMessage(nil), request.Response...), false, nil
 	}
 	return append(json.RawMessage(nil), request.Response...), false, nil
 }
