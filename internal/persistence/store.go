@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"specimen-custody-gate/internal/domain"
 )
@@ -28,6 +29,39 @@ type Store struct {
 	sequence     uint64
 }
 
+// lockPathFor returns the path of the cross-process lock file guarding dir.
+func lockPathFor(dir string) string { return filepath.Join(dir, ".store.lock") }
+
+// acquireLock opens the lock file in dir and acquires an exclusive flock(2)
+// that serializes Store instances across separate processes sharing the same
+// data directory. The returned release func releases the lock and closes the
+// handle. The lock file is created with mode 0o600 and never holds event data.
+func acquireLock(dir string) (*os.File, error) {
+	path := lockPathFor(dir)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("打开存储锁文件: %w", err)
+	}
+	if err := flock(file, syscall.LOCK_EX); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("锁定存储目录: %w", err)
+	}
+	return file, nil
+}
+
+func releaseLock(file *os.File) error {
+	if file == nil {
+		return nil
+	}
+	_ = flock(file, syscall.LOCK_UN)
+	return file.Close()
+}
+
+// flock wraps syscall.Flock for any *os.File.
+func flock(file *os.File, how int) error {
+	return syscall.Flock(int(file.Fd()), how)
+}
+
 func Open(dir string) (*Store, error) {
 	if dir == "" {
 		return nil, errors.New("存储目录不能为空")
@@ -35,6 +69,14 @@ func Open(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("创建存储目录: %w", err)
 	}
+	// Hold the cross-process lock for the whole open path so concurrent
+	// writers cannot mutate the log while we validate the digest chain and
+	// refresh the projection snapshot.
+	lockFile, err := acquireLock(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = releaseLock(lockFile) }()
 	s := &Store{dir: dir, logPath: filepath.Join(dir, "events.jsonl"), snapshotPath: filepath.Join(dir, "projection.json"), batches: map[string]*domain.TransferBatch{}, idempotency: map[string]IdempotencyResult{}}
 	if err := s.loadLog(); err != nil {
 		return nil, err

@@ -43,6 +43,19 @@ func (s *Store) loadLog() error {
 	return nil
 }
 
+// reloadLog re-reads the full event log from disk and rebuilds the in-memory
+// projection. It is called under the cross-process lock right before a commit
+// so that a Store sees records written by other processes since it was opened,
+// keeping sequence numbers and SHA-256 digest chain contiguous.
+func (s *Store) reloadLog() error {
+	s.batches = map[string]*domain.TransferBatch{}
+	s.records = s.records[:0]
+	s.idempotency = map[string]IdempotencyResult{}
+	s.sequence = 0
+	s.lastDigest = ""
+	return s.loadLog()
+}
+
 func (s *Store) replayRecord(record LogRecord) error {
 	expectedSequence := s.sequence + 1
 	if record.SchemaVersion != SchemaVersion {

@@ -22,6 +22,21 @@ type CommitRequest struct {
 func (s *Store) Commit(request CommitRequest) (json.RawMessage, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Acquire a cross-process exclusive lock so that Store instances pointing
+	// at the same data directory cannot append concurrently. Without this,
+	// two processes can each compute Sequence N+1 against the same previous
+	// digest, both append successfully, and leave the chain non-contiguous.
+	lockFile, err := acquireLock(s.dir)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = releaseLock(lockFile) }()
+	// Re-read the log from disk so we observe records committed by other
+	// processes since we were opened; this keeps sequence numbers, digest
+	// chain, idempotency map and batch versions strictly continuous.
+	if err := s.reloadLog(); err != nil {
+		return nil, false, fmt.Errorf("重载事件日志: %w", err)
+	}
 	if existing, ok := s.idempotency[request.IdempotencyKey]; ok {
 		if existing.RequestDigest != request.RequestDigest {
 			return nil, false, domain.ErrIdempotencyConflict
