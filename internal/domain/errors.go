@@ -12,6 +12,7 @@ var (
 	ErrInvalidTransition   = errors.New("非法状态迁移")
 	ErrFrozen              = errors.New("入库清单已冻结")
 	ErrForbidden           = errors.New("角色无权执行此操作")
+	ErrRequestTooLarge     = errors.New("请求体超过 1 MiB 上限")
 )
 
 type FieldError struct {

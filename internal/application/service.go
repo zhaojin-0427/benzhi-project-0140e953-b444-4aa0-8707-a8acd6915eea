@@ -63,5 +63,5 @@ func IsKnownError(err error) bool {
 		return false
 	}
 	var field *domain.FieldError
-	return errors.As(err, &field) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrVersionConflict) || errors.Is(err, domain.ErrIdempotencyConflict) || errors.Is(err, domain.ErrInvalidTransition) || errors.Is(err, domain.ErrFrozen) || errors.Is(err, domain.ErrForbidden)
+	return errors.As(err, &field) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrVersionConflict) || errors.Is(err, domain.ErrIdempotencyConflict) || errors.Is(err, domain.ErrInvalidTransition) || errors.Is(err, domain.ErrFrozen) || errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrRequestTooLarge)
 }

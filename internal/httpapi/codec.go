@@ -33,6 +33,10 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return domain.ErrRequestTooLarge
+		}
 		return &domain.FieldError{Issues: []domain.ValidationIssue{domain.NewIssue("invalid_json", "body", "JSON 请求体无效: "+err.Error())}}
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
@@ -55,6 +59,8 @@ func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.As(err, &field):
 		status, code, message, detail.Issues = http.StatusUnprocessableEntity, "validation_failed", err.Error(), field.Issues
+	case errors.Is(err, domain.ErrRequestTooLarge):
+		status, code, message = http.StatusRequestEntityTooLarge, "request_too_large", err.Error()
 	case errors.Is(err, domain.ErrNotFound):
 		status, code, message = http.StatusNotFound, "not_found", err.Error()
 	case errors.Is(err, domain.ErrVersionConflict):
