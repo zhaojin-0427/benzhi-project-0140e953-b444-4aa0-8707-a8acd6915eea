@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,10 @@ type CommitRequest struct {
 }
 
 func (s *Store) Commit(request CommitRequest) (json.RawMessage, bool, error) {
+	return s.CommitContext(context.Background(), request)
+}
+
+func (s *Store) CommitContext(ctx context.Context, request CommitRequest) (json.RawMessage, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if existing, ok := s.idempotency[request.IdempotencyKey]; ok {
@@ -71,6 +76,9 @@ func (s *Store) Commit(request CommitRequest) (json.RawMessage, bool, error) {
 	record.Digest = audit.Digest(record.PreviousDigest, record.Sequence, canonical)
 	line, err := json.Marshal(record)
 	if err != nil {
+		return nil, false, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, false, err
 	}
 	file, err := os.OpenFile(s.logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o640)

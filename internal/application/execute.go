@@ -82,7 +82,7 @@ func (s *Service) executeContext(ctx context.Context, batchID, action string, me
 		return nil, err
 	}
 	record := audit.Build(audit.Context{Actor: meta.Actor, Role: meta.Role, RequestID: meta.RequestID, IdempotencyKey: meta.IdempotencyKey}, batchID, action, "accepted", event.Version, event.OccurredAt)
-	stored, replay, err := s.store.Commit(persistence.CommitRequest{ExpectedVersion: meta.ExpectedVersion, Event: event, Audit: record, IdempotencyKey: meta.IdempotencyKey, RequestDigest: digest, Response: response})
+	stored, replay, err := s.store.CommitContext(ctx, persistence.CommitRequest{ExpectedVersion: meta.ExpectedVersion, Event: event, Audit: record, IdempotencyKey: meta.IdempotencyKey, RequestDigest: digest, Response: response})
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -53,6 +54,8 @@ func writeError(w http.ResponseWriter, err error) {
 	var field *domain.FieldError
 	detail := errorDetail{}
 	switch {
+	case errors.Is(err, context.Canceled):
+		status, code, message = 499, "client_canceled", "客户端取消请求"
 	case errors.As(err, &field):
 		status, code, message, detail.Issues = http.StatusUnprocessableEntity, "validation_failed", err.Error(), field.Issues
 	case errors.Is(err, domain.ErrNotFound):

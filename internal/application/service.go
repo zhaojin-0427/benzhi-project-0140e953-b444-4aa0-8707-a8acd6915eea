@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +17,7 @@ type serviceStore interface {
 	Get(string) (*domain.TransferBatch, error)
 	List() ([]domain.TransferBatch, error)
 	LookupIdempotency(string, string) (json.RawMessage, bool, error)
-	Commit(persistence.CommitRequest) (json.RawMessage, bool, error)
+	CommitContext(context.Context, persistence.CommitRequest) (json.RawMessage, bool, error)
 	RecordsForBatch(string) []persistence.LogRecord
 	InspectCertificateIssuance(string, domain.DepositCertificate) persistence.CertificateIssuanceInspection
 }
