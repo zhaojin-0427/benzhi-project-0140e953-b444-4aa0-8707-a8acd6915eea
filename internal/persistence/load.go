@@ -27,6 +27,9 @@ func (s *Store) loadLog() error {
 		if len(line) > 0 {
 			var record LogRecord
 			if err := json.Unmarshal(line, &record); err != nil {
+				if errors.Is(readErr, io.EOF) {
+					break
+				}
 				return fmt.Errorf("事件日志第 %d 行无法解析: %w", s.sequence+1, err)
 			}
 			if err := s.replayRecord(record); err != nil {
