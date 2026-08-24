@@ -12,14 +12,15 @@ import (
 )
 
 type Service struct {
-	mu    sync.Mutex
-	store *persistence.Store
-	now   func() time.Time
-	id    func(string) string
+	mu        sync.Mutex
+	store     *persistence.Store
+	now       func() time.Time
+	id        func(string) string
+	readiness map[string]readinessCacheEntry
 }
 
 func NewService(store *persistence.Store) *Service {
-	return &Service{store: store, now: time.Now, id: newID}
+	return &Service{store: store, now: time.Now, id: newID, readiness: map[string]readinessCacheEntry{}}
 }
 
 func newID(prefix string) string {
