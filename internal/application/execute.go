@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -29,6 +30,13 @@ func requestDigest(action, batchID string, meta CommandMeta, command any) (strin
 }
 
 func (s *Service) execute(batchID, action string, meta CommandMeta, command any, build eventBuilder) (*BatchResult, error) {
+	return s.executeContext(context.Background(), batchID, action, meta, command, build)
+}
+
+func (s *Service) executeContext(ctx context.Context, batchID, action string, meta CommandMeta, command any, build eventBuilder) (*BatchResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if err := validateMeta(meta); err != nil {
 		return nil, err
 	}

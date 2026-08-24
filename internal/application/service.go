@@ -3,6 +3,7 @@ package application
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -11,14 +12,23 @@ import (
 	"specimen-custody-gate/internal/persistence"
 )
 
+type serviceStore interface {
+	Get(string) (*domain.TransferBatch, error)
+	List() ([]domain.TransferBatch, error)
+	LookupIdempotency(string, string) (json.RawMessage, bool, error)
+	Commit(persistence.CommitRequest) (json.RawMessage, bool, error)
+	RecordsForBatch(string) []persistence.LogRecord
+	InspectCertificateIssuance(string, domain.DepositCertificate) persistence.CertificateIssuanceInspection
+}
+
 type Service struct {
 	mu    sync.Mutex
-	store *persistence.Store
+	store serviceStore
 	now   func() time.Time
 	id    func(string) string
 }
 
-func NewService(store *persistence.Store) *Service {
+func NewService(store serviceStore) *Service {
 	return &Service{store: store, now: time.Now, id: newID}
 }
 

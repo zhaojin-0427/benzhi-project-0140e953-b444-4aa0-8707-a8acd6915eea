@@ -17,7 +17,7 @@ func (s *Server) CreateBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	populateMeta(r, &command.CommandMeta)
-	result, err := s.service.CreateBatch(command)
+	result, err := s.service.CreateBatchContext(r.Context(), command)
 	if err != nil {
 		writeError(w, err)
 		return
