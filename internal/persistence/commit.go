@@ -73,19 +73,17 @@ func (s *Store) Commit(request CommitRequest) (json.RawMessage, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	file, err := os.OpenFile(s.logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o640)
-	if err != nil {
-		return nil, false, fmt.Errorf("打开事件日志: %w", err)
+	if s.logFile == nil {
+		s.logFile, err = os.OpenFile(s.logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o640)
+		if err != nil {
+			return nil, false, fmt.Errorf("打开事件日志: %w", err)
+		}
 	}
-	if _, err = file.Write(append(line, '\n')); err == nil {
-		err = file.Sync()
+	if _, err = s.logFile.Write(append(line, '\n')); err == nil {
+		err = s.logFile.Sync()
 	}
-	closeErr := file.Close()
 	if err != nil {
 		return nil, false, fmt.Errorf("同步事件日志: %w", err)
-	}
-	if closeErr != nil {
-		return nil, false, fmt.Errorf("关闭事件日志: %w", closeErr)
 	}
 	s.batches[request.Event.BatchID] = candidate
 	s.records = append(s.records, record)

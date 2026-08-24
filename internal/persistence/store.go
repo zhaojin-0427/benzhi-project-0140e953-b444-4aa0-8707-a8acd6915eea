@@ -21,6 +21,7 @@ type Store struct {
 	dir          string
 	logPath      string
 	snapshotPath string
+	logFile      *os.File
 	batches      map[string]*domain.TransferBatch
 	records      []LogRecord
 	idempotency  map[string]IdempotencyResult
