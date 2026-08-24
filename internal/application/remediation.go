@@ -83,8 +83,13 @@ func (s *Service) VerifyCertificate(batchID string) (*CertificateVerification, e
 }
 
 func (s *Service) Timeline(batchID string) ([]audit.TimelineEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, err := s.store.Get(batchID); err != nil {
 		return nil, err
+	}
+	if cached, ok := s.timelineCache[batchID]; ok {
+		return append([]audit.TimelineEntry(nil), cached...), nil
 	}
 	records := s.store.RecordsForBatch(batchID)
 	entries := make([]audit.TimelineEntry, 0, len(records))
@@ -92,5 +97,6 @@ func (s *Service) Timeline(batchID string) ([]audit.TimelineEntry, error) {
 		entries = append(entries, audit.TimelineEntry{Sequence: record.Sequence, EventType: record.Event.Type, BatchVersion: record.Event.Version, Actor: record.Audit.Actor, Role: record.Audit.Role, Action: record.Audit.Action, Result: record.Audit.Result, OccurredAt: record.Event.OccurredAt.Format("2006-01-02T15:04:05.999999999Z07:00"), PreviousDigest: record.PreviousDigest, Digest: record.Digest})
 	}
 	audit.SortTimeline(entries)
-	return entries, nil
+	s.timelineCache[batchID] = append([]audit.TimelineEntry(nil), entries...)
+	return append([]audit.TimelineEntry(nil), entries...), nil
 }

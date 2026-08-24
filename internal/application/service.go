@@ -7,19 +7,26 @@ import (
 	"sync"
 	"time"
 
+	"specimen-custody-gate/internal/audit"
 	"specimen-custody-gate/internal/domain"
 	"specimen-custody-gate/internal/persistence"
 )
 
 type Service struct {
-	mu    sync.Mutex
-	store *persistence.Store
-	now   func() time.Time
-	id    func(string) string
+	mu            sync.Mutex
+	store         *persistence.Store
+	now           func() time.Time
+	id            func(string) string
+	timelineCache map[string][]audit.TimelineEntry
 }
 
 func NewService(store *persistence.Store) *Service {
-	return &Service{store: store, now: time.Now, id: newID}
+	return &Service{
+		store:         store,
+		now:           time.Now,
+		id:            newID,
+		timelineCache: make(map[string][]audit.TimelineEntry),
+	}
 }
 
 func newID(prefix string) string {
