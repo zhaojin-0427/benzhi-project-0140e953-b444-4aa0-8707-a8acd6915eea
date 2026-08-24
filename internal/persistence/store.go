@@ -76,14 +76,7 @@ func (s *Store) List() ([]domain.TransferBatch, error) {
 }
 
 func cloneBatch(batch *domain.TransferBatch) (*domain.TransferBatch, error) {
-	data, err := json.Marshal(batch)
-	if err != nil {
-		return nil, err
-	}
-	var result domain.TransferBatch
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, err
-	}
+	result := *batch
 	return &result, nil
 }
 
